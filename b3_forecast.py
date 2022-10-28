@@ -1,100 +1,69 @@
+from webbrowser import get
 import pandas as pd 
 import numpy as np
 import random
 import datetime as dt
-import seaborn as sns
-import matplotlib.pyplot as plt
-import yfinance as yf
+import pandas_datareader as pdr
 
 
 from scipy.stats import norm
 
 
-def retornosDiariosSMC(dados,tempoPredicao,numSimulacoes):
-    tempoPredicao += 1
-    retorno_logaritmico = np.log(1 + dados.pct_change())
-    tendecia_retorno    = retorno_logaritmico.mean()
-    variancia           = retorno_logaritmico.var()
-    drift               = tendecia_retorno - (0.5 * variancia)
-    desvio_padrao       = retorno_logaritmico.std()
+def get_historical_adjclose(stocks, start=None, end=None):
+    times_series = pdr.get_data_yahoo(stocks, start, end)['Adj Close']
+    return times_series
+
+
+def get_daily_return(adj_close, period_predictions, num_simulations):
+    period_predictions += 1
+    logarithmic_retunr = np.log(1 + adj_close.pct_change())
+    return_trend    = logarithmic_retunr.mean()
+    variance           = logarithmic_retunr.var()
+    drift               = return_trend - (0.5 * variance)
+    standart_deviation       = logarithmic_retunr.std()
  
-    retornoDiario = np.exp(drift + desvio_padrao * norm.ppf(np.random.rand(tempoPredicao, numSimulacoes)))
-    return retornoDiario
-
-def retornaListaPrecoSMC(retornoDiario, precoInicial, tempoPredicao): 
-    tempoPredicao +=1
-    inicProc = dt.datetime.now()
-    print('Gerando Lista de Preços..')
-    listaPrecos  = np.zeros_like(retornoDiario)
-    listaPrecos[0] = precoInicial
-
-    for tp in range(1, tempoPredicao):
-        listaPrecos[tp] = listaPrecos[tp - 1] * retornoDiario[tp]
-    print('Lista Gerada.') 
-    return listaPrecos 
-
-
-def retornaQuantis(dados, listaProbabilidades, valorInicial):
-    quantil = np.quantile(dados, q=listaProbabilidades)    
-     
-    pro_quantil = np.zeros_like(quantil)
+    daily_return = np.exp(drift + standart_deviation * norm.ppf(np.random.rand(period_predictions, num_simulations)))
     
-    for i in range(0, len(quantil)):
-        pro_quantil[i] = (1 - (valorInicial/quantil[i])*100) 
-   
-    return  pro_quantil 
+    return daily_return
 
+def get_mcs_price_list(daily_return, initial_price, period_predictions): 
+    period_predictions +=1
+    price_list  = np.zeros_like(daily_return)
+    price_list[0] = initial_price
 
-def taxaErroValorReal(valorFinalReal,valoFinalEstimado,precoInicial):
-    taxaErro =  ((valorFinalReal-valoFinalEstimado)*100)/precoInicial
-    if(taxaErro < 0):
-        taxaErro = taxaErro * -1
-   
-    return taxaErro
+    for tp in range(1, period_predictions):
+        price_list[tp] = price_list[tp - 1] * daily_return[tp]
+    return price_list 
 
-def taxaProximidadeAcertoValorReal(taxaErro):
-    if(taxaErro > 0):
-           return 100 - taxaErro
+def error_rate(real_price, predicted_price, initial_price):
+    error_rate =  ((real_price - predicted_price)*100)/ initial_price
+    if(error_rate < 0):
+        return round(100 + (error_rate * -1),2)
     else:
-           return 100 + taxaErro 
+        return round((100 - error_rate),2)
 
 
+#end = dt.datetime.now()
+#start = dt.datetime(2017,11,3)
+
+stock = "SULA11.SA"
+start = dt.datetime(2000,1,1)
+end = dt.datetime(2022,10,27)
+period_predictions= 1
+num_simulations = 1000000
+adjClose = get_historical_adjclose(stock, start, end)
+real_price_list = get_historical_adjclose(stock, dt.datetime(2022,10,25))
+real_price = real_price_list[-1]
+initial_price = adjClose.iloc[-1]
+daily_return = get_daily_return(adjClose, period_predictions, num_simulations)
+price_list = get_mcs_price_list(daily_return,initial_price,period_predictions)
 #'WEGE3.SA MGLU3.SA VALE3.SA SULA11.SA ITSA4.SA'
-acoes = yf.Tickers('SULA3.SA')
-print(acoes)
-acoes_hist_max = acoes.history(period="1mo")
-df_acoes = acoes_hist_max['2010':] 
-df_acoes_close = df_acoes['Close']
+predictions = []
 
-period= 30
-num_simulations = 10000 
-precoInicial = df_acoes_close['MGLU3'].iloc[-1]
+for preco in price_list:
+  predictions.append(random.uniform(preco.mean()-preco.std(),preco.mean()+preco.std()))
+print(real_price_list)
+print(f'PREDICTION PRICE: {predictions}')
+print(f'REAL PRICE: {real_price}')
+print(f'ERROR RATE: {error_rate(real_price, predictions[-1], initial_price)} %')
 
-df_acoes_close.plot(kind='line', figsize=(12,12), subplots=True)
-
-retornoDiario = retornosDiariosSMC(df_acoes_close['MGLU3'],period,num_simulations)
-precosEstimados = retornaListaPrecoSMC(retornoDiario,precoInicial,period) 
-
-
-estimados_mean = []
-estimados_std = []
-estimados_max = []
-estimados_min = []
-estimados = []
-
-for preco in precosEstimados:
-  estimados_mean.append(preco.mean())
-  estimados_std.append(preco.std())
-  estimados_max.append(preco.max())
-  estimados_min.append(preco.min())
-  estimados.append(random.uniform(preco.mean()-preco.std(),preco.mean()+preco.std()))
-
-print(f'PRECOS ESTIMADO: {estimados}')
-df_acoes_close.tail(10)
-
-plt.figure(figsize=(12,8))
-plt.title('Simulações de Monte Carlo '+str(num_simulations)+' SMC x '+str(period)+' Dias',fontsize=16)
-plt.xlabel('Período em dias',fontsize=12)
-plt.ylabel('Preços em R$',fontsize=12)
-plt.plot(estimados)
-plt.show()

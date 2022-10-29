@@ -16,11 +16,11 @@ def get_historical_adjclose(stocks, start=None, end=None):
 
 def get_daily_return(adj_close, period_predictions, num_simulations):
     period_predictions += 1
-    logarithmic_retunr = np.log(1 + adj_close.pct_change())
-    return_trend    = logarithmic_retunr.mean()
-    variance           = logarithmic_retunr.var()
-    drift               = return_trend - (0.5 * variance)
-    standart_deviation       = logarithmic_retunr.std()
+    logarithmic_return = np.log(1 + adj_close.pct_change())
+    return_trend       = logarithmic_return.mean()
+    variance           = logarithmic_return.var()
+    drift              = return_trend - (0.5 * variance)
+    standart_deviation = logarithmic_return.std()
  
     daily_return = np.exp(drift + standart_deviation * norm.ppf(np.random.rand(period_predictions, num_simulations)))
     
@@ -31,17 +31,23 @@ def get_mcs_price_list(daily_return, initial_price, period_predictions):
     price_list  = np.zeros_like(daily_return)
     price_list[0] = initial_price
 
-    for tp in range(1, period_predictions):
-        price_list[tp] = price_list[tp - 1] * daily_return[tp]
+    for period in range(1, period_predictions):
+        price_list[period] = price_list[period - 1] * daily_return[period]
     return price_list 
 
-def error_rate(real_price, predicted_price, initial_price):
-    error_rate =  ((real_price - predicted_price)*100)/ initial_price
-    if(error_rate < 0):
-        return round(100 + (error_rate * -1),2)
+def show_efficacy(real_price, predicted_price, initial_price):
+    efficaccy =  ((real_price - predicted_price)*100) / initial_price
+    diff_pred  = diff_prediction_real_value(real_price, predicted_price)
+    
+    print(f"ORIGINAL: {round(real_price,3)} | PREDICTED: {round(predicted_price,3)}")
+    if(efficaccy < 0):
+        print(f"DIFF: {round(diff_pred,3)}  | EFFICACY: {round(100 + (efficaccy * -1),3)}%")
     else:
-        return round((100 - error_rate),2)
+        print(f"DIFF: +{round(diff_pred,3)} | EFFICACY: {round((100 - efficaccy),3)}%")
+    
 
+def diff_prediction_real_value(real_price, predicted_price):
+    return real_price - predicted_price
 
 #end = dt.datetime.now()
 #start = dt.datetime(2017,11,3)
@@ -63,7 +69,5 @@ predictions = []
 for preco in price_list:
   predictions.append(random.uniform(preco.mean()-preco.std(),preco.mean()+preco.std()))
 print(real_price_list)
-print(f'PREDICTION PRICE: {predictions}')
-print(f'REAL PRICE: {real_price}')
-print(f'ERROR RATE: {error_rate(real_price, predictions[-1], initial_price)} %')
+show_efficacy(real_price, predictions[-1], initial_price)
 

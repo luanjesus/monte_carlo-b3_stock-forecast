@@ -1,5 +1,4 @@
-from webbrowser import get
-import pandas as pd 
+import sys
 import numpy as np
 import random
 import datetime as dt
@@ -23,7 +22,6 @@ def get_daily_return(adj_close, period_predictions, num_simulations):
     standart_deviation = logarithmic_return.std()
  
     daily_return = np.exp(drift + standart_deviation * norm.ppf(np.random.rand(period_predictions, num_simulations)))
-    
     return daily_return
 
 def get_mcs_price_list(daily_return, initial_price, period_predictions): 
@@ -41,33 +39,42 @@ def show_efficacy(real_price, predicted_price, initial_price):
     
     print(f"ORIGINAL: {round(real_price,3)} | PREDICTED: {round(predicted_price,3)}")
     if(efficaccy < 0):
-        print(f"DIFF: {round(diff_pred,3)}  | EFFICACY: {round(100 + (efficaccy * -1),3)}%")
+        print(f"DIFF: {round(diff_pred,3)}  | EFFICACY: {round(100 + efficaccy,3)}%")
     else:
-        print(f"DIFF: +{round(diff_pred,3)} | EFFICACY: {round((100 - efficaccy),3)}%")
+        print(f"DIFF: +{round(diff_pred,3)} | EFFICACY: {round((100 + (efficaccy * -1)),3)}%")
     
 
 def diff_prediction_real_value(real_price, predicted_price):
     return real_price - predicted_price
 
-#end = dt.datetime.now()
-#start = dt.datetime(2017,11,3)
+def prediction_list(price_list):
+    predictions = []
+    for price in price_list:
+        predictions.append(random.uniform(price.mean()-price.std(),price.mean()+price.std()))
 
-stock = "SULA11.SA"
-start = dt.datetime(2000,1,1)
-end = dt.datetime(2022,10,27)
-period_predictions= 1
-num_simulations = 1000000
-adjClose = get_historical_adjclose(stock, start, end)
-real_price_list = get_historical_adjclose(stock, dt.datetime(2022,10,25))
-real_price = real_price_list[-1]
-initial_price = adjClose.iloc[-1]
-daily_return = get_daily_return(adjClose, period_predictions, num_simulations)
-price_list = get_mcs_price_list(daily_return,initial_price,period_predictions)
-#'WEGE3.SA MGLU3.SA VALE3.SA SULA11.SA ITSA4.SA'
-predictions = []
+    return predictions
 
-for preco in price_list:
-  predictions.append(random.uniform(preco.mean()-preco.std(),preco.mean()+preco.std()))
-print(real_price_list)
-show_efficacy(real_price, predictions[-1], initial_price)
+def main(args):
+    stock = args
+    #start = dt.datetime(2000,1,1)
+    #end = dt.datetime(2022,10,27)    
+    #adjClose = get_historical_adjclose(stock, start, end)
+    adjClose = get_historical_adjclose(stock)
 
+    period_predictions= 1
+    num_simulations = 10000000
+    real_price_list = get_historical_adjclose(stock, dt.datetime(2022,10,25))
+    real_price = real_price_list[-1]
+    initial_price = adjClose.iloc[-1]
+    daily_return = get_daily_return(adjClose, period_predictions, num_simulations)
+    price_list = get_mcs_price_list(daily_return,initial_price,period_predictions)
+
+    pridiction = prediction_list(price_list)[-1]
+    
+    #show_efficacy(real_price, pridiction, initial_price)
+
+    print(f"PREDICTION: {round(pridiction,3)}")
+
+if __name__ == "__main__":
+    print(sys.argv[1].upper())
+    main(sys.argv[1])
